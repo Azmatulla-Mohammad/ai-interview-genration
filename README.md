@@ -511,49 +511,41 @@ This repository now includes `render.yaml`, so Render can auto-detect backend se
 1. Push this repo to GitHub.
 2. In Render, choose **New +** -> **Blueprint**.
 3. Connect this GitHub repository.
-4. Render will detect `render.yaml` and create `ai-interview-coach-api`.
-5. Set these required secret environment values in Render:
+4. Render will detect `render.yaml` and create two resources:
+
+- `ai-interview-coach-api` (backend web service)
+- `ai-interview-coach-web` (frontend static site)
+5. Set these required backend environment values in Render:
 
 - `DATABASE_URL` (use your Neon URL with `postgresql+psycopg://`)
 - `JWT_SECRET_KEY` (long random secret)
-- `FRONTEND_URL` (your Vercel app URL)
+- `FRONTEND_URL` (set this after frontend deploy, using your Render static site URL)
 - `GEMINI_API_KEY` (optional but recommended)
 
-6. Deploy and wait for build completion.
-7. Verify backend health at:
+6. For the frontend static site (`ai-interview-coach-web`), set:
+
+- `VITE_API_BASE_URL=https://<your-render-service>.onrender.com/api`
+
+7. Deploy and wait for build completion.
+8. Verify backend health at:
 
 ```text
 https://<your-render-service>.onrender.com/health
 ```
 
-8. Your API base URL will be:
+9. Your API base URL will be:
 
 ```text
 https://<your-render-service>.onrender.com/api
 ```
-
-### Deploy Frontend on Vercel
-
-The frontend includes `frontend/vercel.json` for SPA routing.
-
-1. In Vercel, import this GitHub repository.
-2. Set **Root Directory** to `frontend`.
-3. Framework preset: `Vite`.
-4. Add environment variable:
-
-- `VITE_API_BASE_URL=https://<your-render-service>.onrender.com/api`
-
-5. Deploy.
-6. Copy your Vercel URL (for example `https://your-app.vercel.app`).
-7. Update Render `FRONTEND_URL` with that exact Vercel URL and redeploy backend once.
 
 ### Deployment Order
 
 Use this order to avoid CORS issues:
 
 1. Deploy backend on Render and get backend URL.
-2. Deploy frontend on Vercel using that backend URL.
-3. Copy final Vercel URL into backend `FRONTEND_URL`.
+2. Deploy frontend static site on Render using that backend URL.
+3. Copy final frontend Render URL into backend `FRONTEND_URL`.
 4. Redeploy backend.
 
 ### Backend deployment checklist
