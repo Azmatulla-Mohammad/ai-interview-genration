@@ -45,6 +45,16 @@ async function apiRequest(path, options = {}) {
     ? await response.json()
     : await response.text();
 
+  if (
+    typeof payload === "string" &&
+    contentType.includes("text/html") &&
+    /<!doctype html>|<html/i.test(payload)
+  ) {
+    throw new Error(
+      "The frontend is pointing to itself instead of the backend API. Set VITE_API_BASE_URL to your backend URL ending with /api.",
+    );
+  }
+
   if (!response.ok) {
     const message =
       typeof payload === "string"
