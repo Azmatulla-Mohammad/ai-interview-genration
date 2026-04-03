@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const backendOrigin = env.BACKEND_ORIGIN || "http://127.0.0.1:8001";
+  const backendOrigin = env.BACKEND_ORIGIN || "http://127.0.0.1:8000";
 
   return {
     plugins: [react()],
