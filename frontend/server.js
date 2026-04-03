@@ -4,6 +4,7 @@ import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+const HOST = "0.0.0.0";
 const PORT = Number(process.env.PORT || 3000);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -79,6 +80,6 @@ const server = http.createServer(async (request, response) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`Frontend server listening on http://0.0.0.0:${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`Frontend server listening on http://${HOST}:${PORT}`);
 });
