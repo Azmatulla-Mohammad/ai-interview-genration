@@ -1,12 +1,39 @@
+import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import OperationalError
 
 from app.api.routes.auth import router as auth_router
 from app.api.routes.interviews import router as interview_router
-from app.core.config import get_settings
-from app.core.database import create_db_and_tables
+from app.core.config import get_settings, get_settings_status
+from app.core.database import (
+    DatabaseUnavailableError,
+    get_database_status,
+    initialize_database,
+    mark_database_unavailable,
+    summarize_database_exception,
+)
+from app.services.ai_service import get_ai_service_status
+
+
+logger = logging.getLogger(__name__)
+
+
+def _build_health_payload() -> dict:
+    database = get_database_status()
+    configuration = get_settings_status()
+    ai = get_ai_service_status()
+    overall_status = "healthy" if database["available"] and database["mode"] == "configured" else "degraded"
+
+    return {
+        "status": overall_status,
+        "database": database,
+        "configuration": configuration,
+        "ai": ai,
+    }
 
 
 def create_app() -> FastAPI:
@@ -14,7 +41,15 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
-        create_db_and_tables()
+        initialize_database()
+        health = _build_health_payload()
+        if health["status"] == "healthy":
+            logger.info("Application startup completed with the configured database.")
+        else:
+            logger.warning(
+                "Application startup completed in degraded mode. Database state: %s",
+                health["database"]["message"],
+            )
         yield
 
     app = FastAPI(title=settings.app_name, lifespan=lifespan)
@@ -33,15 +68,48 @@ def create_app() -> FastAPI:
 
     @app.get("/")
     def read_root() -> dict:
+        health = _build_health_payload()
         return {
             "name": settings.app_name,
             "environment": settings.app_env,
-            "status": "ok",
+            "status": health["status"],
         }
 
     @app.get("/health")
     def health_check() -> dict:
-        return {"status": "healthy"}
+        return _build_health_payload()
+
+    @app.get("/ready")
+    def readiness_check(response: Response) -> dict:
+        database = get_database_status()
+        if not database["available"]:
+            response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {
+            "status": "ready" if database["available"] else "not_ready",
+            "database": database,
+        }
+
+    @app.exception_handler(DatabaseUnavailableError)
+    def handle_database_unavailable(_: Request, exc: DatabaseUnavailableError) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "detail": str(exc) or "Database is currently unavailable.",
+                "database": get_database_status(),
+            },
+        )
+
+    @app.exception_handler(OperationalError)
+    def handle_database_operational_error(_: Request, exc: OperationalError) -> JSONResponse:
+        mark_database_unavailable(exc)
+        logger.warning("Database request failed: %s", summarize_database_exception(exc))
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "detail": "Database request failed.",
+                "database": get_database_status(),
+            },
+        )
 
     app.include_router(auth_router, prefix=settings.api_prefix)
     app.include_router(interview_router, prefix=settings.api_prefix)

@@ -63,6 +63,10 @@ export function AnswerPage() {
     };
   }, [queryBatchId, queryPageSize, questionId, token]);
 
+  useEffect(() => {
+    setAnswer("");
+  }, [question?.id]);
+
   const progress = useMemo(() => {
     if (!question || !batchQuestions.length) {
       return {
@@ -85,12 +89,23 @@ export function AnswerPage() {
     };
   }, [batchQuestions, question]);
 
+  const resolvedJobRole =
+    question?.job_role || queryJobRole || batchQuestions[0]?.job_role || "";
+  const resolvedDifficulty =
+    question?.difficulty || queryDifficulty || batchQuestions[0]?.difficulty || "";
+  const resolvedPageSize = Math.max(
+    progress.total || 0,
+    batchQuestions.length || 0,
+    queryPageSize,
+    5,
+  );
+
   function buildSessionPath(targetQuestionId) {
     const params = new URLSearchParams({
       batchId: question?.batch_id || queryBatchId,
-      pageSize: String(Math.max(progress.total || 0, queryPageSize, 5)),
-      jobRole: question?.job_role || queryJobRole,
-      difficulty: question?.difficulty || queryDifficulty,
+      pageSize: String(resolvedPageSize),
+      jobRole: resolvedJobRole,
+      difficulty: resolvedDifficulty,
     });
     return `/questions/${targetQuestionId}?${params.toString()}`;
   }
@@ -110,9 +125,9 @@ export function AnswerPage() {
       );
       const params = new URLSearchParams();
       params.set("batchId", question?.batch_id || searchParams.get("batchId") || result.batch_id);
-      params.set("pageSize", String(Math.max(progress.total || 0, queryPageSize, 5)));
-      params.set("jobRole", question?.job_role || queryJobRole);
-      params.set("difficulty", question?.difficulty || queryDifficulty);
+      params.set("pageSize", String(resolvedPageSize));
+      params.set("jobRole", resolvedJobRole);
+      params.set("difficulty", resolvedDifficulty);
       navigate(`/results/${result.evaluation_id}?${params.toString()}`);
     } catch (submissionError) {
       setError(submissionError.message);
@@ -139,15 +154,15 @@ export function AnswerPage() {
               <h1>
                 {progress.currentIndex >= 0
                   ? `Question ${progress.currentIndex + 1} of ${progress.total}`
-                  : question?.job_role || queryJobRole || "Interview question"}
+                  : resolvedJobRole || "Interview question"}
               </h1>
               <p>
                 Answer with structure, explain your reasoning clearly, and keep your examples practical like a real interview round.
               </p>
             </div>
             <div className="hero-chip-row">
-              <span className="hero-chip">{question?.job_role || queryJobRole || "Role focus"}</span>
-              <span className="hero-chip">{question?.difficulty || queryDifficulty || "Difficulty"}</span>
+              <span className="hero-chip">{resolvedJobRole || "Role focus"}</span>
+              <span className="hero-chip">{resolvedDifficulty || "Difficulty"}</span>
               <span className="hero-chip">
                 {progress.remainingCount > 0
                   ? `${progress.remainingCount} question${progress.remainingCount > 1 ? "s" : ""} left`
@@ -183,7 +198,7 @@ export function AnswerPage() {
           <div className="section-heading-row">
             <div>
               <span className="eyebrow">Question prompt</span>
-              <h2>{question?.job_role || queryJobRole || "Interview question"}</h2>
+              <h2>{resolvedJobRole || "Interview question"}</h2>
             </div>
             <div className="button-row">
               <Link to="/history" className="button button-secondary button-small">
@@ -219,7 +234,7 @@ export function AnswerPage() {
 
           <article className="question-prompt question-prompt-large spotlight-card">
             <div className="question-card-top">
-              <span className="question-meta-tag">{question?.difficulty || queryDifficulty}</span>
+              <span className="question-meta-tag">{resolvedDifficulty || "Difficulty"}</span>
               {progress.currentIndex >= 0 ? <span className="score-pill">Step {progress.currentIndex + 1}</span> : null}
             </div>
             <p>{question?.question_text}</p>
@@ -249,10 +264,20 @@ export function AnswerPage() {
               </label>
 
               <div className="practice-action-bar">
-                <div className="inline-hint">
-                  {progress.nextQuestion
-                    ? `Next in queue: Question ${progress.currentIndex + 2}`
-                    : "This is the final question in the current session."}
+                <div className="practice-action-meta">
+                  <div className="inline-hint">
+                    {progress.nextQuestion
+                      ? `Next in queue: Question ${progress.currentIndex + 2}`
+                      : "This is the final question in the current session."}
+                  </div>
+                  {progress.nextQuestion ? (
+                    <Link
+                      to={buildSessionPath(progress.nextQuestion.id)}
+                      className="button button-secondary button-small"
+                    >
+                      Next question
+                    </Link>
+                  ) : null}
                 </div>
                 <div className="button-row">
                   <button type="submit" className="button button-primary" disabled={submitting}>
@@ -308,25 +333,62 @@ export function AnswerPage() {
               <h3>Question order</h3>
               <div className="session-step-list">
                 {batchQuestions.map((item, index) => {
-                  const stateClass =
-                    item.id === question?.id
-                      ? "session-step-current"
-                      : index < progress.currentIndex
-                        ? "session-step-complete"
-                        : "session-step-upcoming";
+                  const isCurrent = item.id === question?.id;
+                  const isComplete = index < progress.currentIndex;
+                  const isLocked = index > progress.currentIndex;
+                  const stateClass = isCurrent
+                    ? "session-step-current"
+                    : isComplete
+                      ? "session-step-complete"
+                      : "session-step-locked";
+                  const stepContent = (
+                    <>
+                      <span className="session-step-number">{index + 1}</span>
+                      <div className="session-step-copy">
+                        <strong>
+                          {isCurrent
+                            ? "Current question"
+                            : isComplete
+                              ? `Question ${index + 1}`
+                              : "Locked until submit"}
+                        </strong>
+                        {isLocked ? (
+                          <>
+                            <div className="session-step-mask" aria-hidden="true">
+                              <span />
+                              <span />
+                            </div>
+                            <span className="session-step-lock-note">
+                              Submit this answer to reveal question {index + 1}.
+                            </span>
+                          </>
+                        ) : (
+                          <p>{item.question_text}</p>
+                        )}
+                      </div>
+                    </>
+                  );
+
+                  if (isComplete) {
+                    return (
+                      <Link
+                        key={item.id}
+                        to={buildSessionPath(item.id)}
+                        className={`session-step-card session-step-interactive ${stateClass}`}
+                      >
+                        {stepContent}
+                      </Link>
+                    );
+                  }
 
                   return (
-                    <Link
+                    <div
                       key={item.id}
-                      to={buildSessionPath(item.id)}
-                      className={`session-step-card ${stateClass}`}
+                      className={`session-step-card session-step-static ${stateClass}`}
+                      aria-current={isCurrent ? "step" : undefined}
                     >
-                      <span className="session-step-number">{index + 1}</span>
-                      <div>
-                        <strong>{item.id === question?.id ? "Current question" : `Question ${index + 1}`}</strong>
-                        <p>{item.question_text}</p>
-                      </div>
-                    </Link>
+                      {stepContent}
+                    </div>
                   );
                 })}
               </div>

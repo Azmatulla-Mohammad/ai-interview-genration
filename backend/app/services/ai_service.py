@@ -4,10 +4,9 @@ import re
 from collections.abc import Iterable
 from functools import lru_cache
 
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 
 
-settings = get_settings()
 logger = logging.getLogger(__name__)
 
 try:
@@ -17,10 +16,14 @@ except ImportError:  # pragma: no cover
 
 
 class AIService:
-    def __init__(self) -> None:
+    def __init__(self, settings: Settings | None = None) -> None:
+        self.settings = settings or get_settings()
         self.client = None
-        if settings.gemini_api_key and genai is not None:
-            self.client = genai.Client(api_key=settings.gemini_api_key)
+        if self.settings.gemini_api_key and genai is not None:
+            try:
+                self.client = genai.Client(api_key=self.settings.gemini_api_key)
+            except Exception as exc:
+                logger.warning("Gemini client setup failed; using local fallbacks: %s", exc)
 
     def generate_questions(self, job_role: str, difficulty: str, count: int) -> list[str]:
         prompt = f"""
@@ -33,7 +36,7 @@ Do not include markdown, titles, explanations, or numbering outside the JSON arr
         if self.client is not None:
             try:
                 response = self.client.models.generate_content(
-                    model=settings.gemini_model,
+                    model=self.settings.gemini_model,
                     contents=prompt,
                 )
                 parsed = self._load_json_array(getattr(response, "text", "") or "")
@@ -69,7 +72,7 @@ Be fair, practical, and concise.
         if self.client is not None:
             try:
                 response = self.client.models.generate_content(
-                    model=settings.gemini_model,
+                    model=self.settings.gemini_model,
                     contents=prompt,
                 )
                 parsed = self._load_json_object(getattr(response, "text", "") or "")
@@ -206,3 +209,26 @@ Be fair, practical, and concise.
 @lru_cache
 def get_ai_service() -> AIService:
     return AIService()
+
+
+def get_ai_service_status() -> dict:
+    settings = get_settings()
+
+    if not settings.gemini_api_key:
+        return {
+            "available": True,
+            "mode": "local-fallback",
+            "message": "Gemini API key is not configured; local question and evaluation fallbacks are active.",
+        }
+    if genai is None:
+        return {
+            "available": True,
+            "mode": "local-fallback",
+            "message": "google-genai is not installed; local question and evaluation fallbacks are active.",
+        }
+
+    return {
+        "available": True,
+        "mode": "gemini",
+        "message": "Gemini is configured. If remote requests fail, the app will still use local fallbacks.",
+    }

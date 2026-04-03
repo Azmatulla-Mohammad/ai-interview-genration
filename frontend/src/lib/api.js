@@ -1,5 +1,4 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
 
 function buildQuery(params = {}) {
   const search = new URLSearchParams();
@@ -32,7 +31,15 @@ async function apiRequest(path, options = {}) {
     config.body = JSON.stringify(body);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, config);
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, config);
+  } catch (error) {
+    throw new Error(
+      "Cannot reach the backend API. Make sure the backend is running and the frontend API URL matches it.",
+    );
+  }
+
   const contentType = response.headers.get("content-type") || "";
   const payload = contentType.includes("application/json")
     ? await response.json()

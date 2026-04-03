@@ -9,7 +9,6 @@ from jose import JWTError, jwt
 from app.core.config import get_settings
 
 
-settings = get_settings()
 PBKDF2_ITERATIONS = 390000
 
 
@@ -49,6 +48,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def create_access_token(user_id: int) -> str:
+    settings = get_settings()
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
     payload = {
         "sub": str(user_id),
@@ -58,6 +58,7 @@ def create_access_token(user_id: int) -> str:
 
 
 def decode_access_token(token: str) -> dict:
+    settings = get_settings()
     try:
         return jwt.decode(
             token,

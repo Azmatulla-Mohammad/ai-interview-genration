@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
+import { FormattedText } from "../components/FormattedText";
 import { LoadingBlock } from "../components/LoadingBlock";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
 
 export function ResultPage() {
   const { evaluationId } = useParams();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { token } = useAuth();
   const [result, setResult] = useState(null);
@@ -83,15 +85,35 @@ export function ResultPage() {
     };
   }, [batchQuestions, result]);
 
+  const currentQuestion =
+    batchQuestions.find((item) => item.id === result?.question_id) || null;
+  const resolvedJobRole =
+    queryJobRole || currentQuestion?.job_role || batchQuestions[0]?.job_role || "";
+  const resolvedDifficulty =
+    queryDifficulty || currentQuestion?.difficulty || batchQuestions[0]?.difficulty || "";
+  const resolvedPageSize = Math.max(
+    progress.total || 0,
+    batchQuestions.length || 0,
+    pageSize,
+    5,
+  );
+
   function buildQuestionPath(targetQuestionId) {
     const params = new URLSearchParams({
       batchId: result?.batch_id || batchIdFromRoute,
-      pageSize: String(Math.max(progress.total || 0, pageSize, 5)),
-      jobRole: queryJobRole || "",
-      difficulty: queryDifficulty || "",
+      pageSize: String(resolvedPageSize),
+      jobRole: resolvedJobRole,
+      difficulty: resolvedDifficulty,
     });
     return `/questions/${targetQuestionId}?${params.toString()}`;
   }
+
+  const nextQuestionPath = progress.nextQuestion
+    ? buildQuestionPath(progress.nextQuestion.id)
+    : "";
+  const retakeQuestionPath = result?.question_id
+    ? buildQuestionPath(result.question_id)
+    : "/questions";
 
   if (loading) {
     return <LoadingBlock label="Loading evaluation result..." />;
@@ -130,21 +152,19 @@ export function ResultPage() {
             </div>
             <div className="button-row">
               {progress.nextQuestion ? (
-                <Link
-                  to={buildQuestionPath(progress.nextQuestion.id)}
+                <button
+                  type="button"
                   className="button button-primary"
+                  onClick={() => navigate(nextQuestionPath)}
                 >
                   Next question
-                </Link>
+                </button>
               ) : (
                 <Link to="/history" className="button button-primary">
                   Finish session
                 </Link>
               )}
-              <Link
-                to={buildQuestionPath(result?.question_id || "")}
-                className="button button-secondary"
-              >
+              <Link to={retakeQuestionPath} className="button button-secondary">
                 Retake question
               </Link>
             </div>
@@ -160,8 +180,8 @@ export function ResultPage() {
                 </p>
               </div>
               <div className="hero-chip-row">
-                <span className="hero-chip">{queryJobRole || "Interview session"}</span>
-                <span className="hero-chip">{queryDifficulty || "Difficulty"}</span>
+                <span className="hero-chip">{resolvedJobRole || "Interview session"}</span>
+                <span className="hero-chip">{resolvedDifficulty || "Difficulty"}</span>
                 <span className="hero-chip">
                   {progress.nextQuestion ? "Next question ready" : "Session complete"}
                 </span>
@@ -199,29 +219,29 @@ export function ResultPage() {
 
             <article className="panel nested-panel spotlight-card">
               <span className="eyebrow">Question</span>
-              <p>{result?.question_text}</p>
+              <FormattedText text={result?.question_text} />
             </article>
 
             <article className="panel nested-panel">
               <span className="eyebrow">Your answer</span>
-              <p>{result?.user_answer}</p>
+              <FormattedText text={result?.user_answer} />
             </article>
 
             <div className="review-grid">
               <article className="panel nested-panel review-card review-card-accent">
                 <span className="eyebrow">Feedback</span>
-                <p>{result?.feedback}</p>
+                <FormattedText text={result?.feedback} />
               </article>
 
               <article className="panel nested-panel review-card review-card-warm">
                 <span className="eyebrow">Missing points</span>
-                <p>{result?.missing_points}</p>
+                <FormattedText text={result?.missing_points} />
               </article>
             </div>
 
             <article className="panel nested-panel review-card review-card-cool">
               <span className="eyebrow">Ideal answer</span>
-              <p>{result?.ideal_answer}</p>
+              <FormattedText text={result?.ideal_answer} />
             </article>
 
             <div className="practice-action-bar result-action-bar">
@@ -232,12 +252,13 @@ export function ResultPage() {
               </div>
               <div className="button-row">
                 {progress.nextQuestion ? (
-                  <Link
-                    to={buildQuestionPath(progress.nextQuestion.id)}
+                  <button
+                    type="button"
                     className="button button-primary"
+                    onClick={() => navigate(nextQuestionPath)}
                   >
                     Continue to next question
-                  </Link>
+                  </button>
                 ) : (
                   <Link to="/generate" className="button button-primary">
                     Start a new session
@@ -287,9 +308,13 @@ export function ResultPage() {
                 : "Review the history or generate another set to start a new mock interview round."}
             </p>
             {progress.nextQuestion ? (
-              <Link to={buildQuestionPath(progress.nextQuestion.id)} className="button button-primary button-small">
+              <button
+                type="button"
+                className="button button-primary button-small"
+                onClick={() => navigate(nextQuestionPath)}
+              >
                 Next question
-              </Link>
+              </button>
             ) : (
               <Link to="/generate" className="button button-secondary button-small">
                 New session
@@ -303,30 +328,65 @@ export function ResultPage() {
               <div className="session-step-list">
                 {batchQuestions.map((item, index) => {
                   const isCurrent = item.id === result?.question_id;
+                  const isComplete = index < progress.currentIndex;
+                  const isNext = item.id === progress.nextQuestion?.id;
                   const stateClass = isCurrent
                     ? "session-step-current"
-                    : index < progress.currentIndex
+                    : isComplete
                       ? "session-step-complete"
-                      : "session-step-upcoming";
-
-                  return (
-                    <Link
-                      key={item.id}
-                      to={buildQuestionPath(item.id)}
-                      className={`session-step-card ${stateClass}`}
-                    >
+                      : isNext
+                        ? "session-step-upcoming"
+                        : "session-step-locked";
+                  const stepContent = (
+                    <>
                       <span className="session-step-number">{index + 1}</span>
-                      <div>
+                      <div className="session-step-copy">
                         <strong>
                           {isCurrent
                             ? "Just answered"
-                            : index === progress.currentIndex + 1
+                            : isNext
                               ? "Next question"
-                              : `Question ${index + 1}`}
+                              : isComplete
+                                ? `Question ${index + 1}`
+                                : "Locked question"}
                         </strong>
-                        <p>{item.question_text}</p>
+                        {isCurrent || isComplete || isNext ? (
+                          <p>{item.question_text}</p>
+                        ) : (
+                          <>
+                            <div className="session-step-mask" aria-hidden="true">
+                              <span />
+                              <span />
+                            </div>
+                            <span className="session-step-lock-note">
+                              Finish the next step to reveal question {index + 1}.
+                            </span>
+                          </>
+                        )}
                       </div>
-                    </Link>
+                    </>
+                  );
+
+                  if (isComplete || isNext) {
+                    return (
+                      <Link
+                        key={item.id}
+                        to={buildQuestionPath(item.id)}
+                        className={`session-step-card session-step-interactive ${stateClass}`}
+                      >
+                        {stepContent}
+                      </Link>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={item.id}
+                      className={`session-step-card session-step-static ${stateClass}`}
+                      aria-current={isCurrent ? "step" : undefined}
+                    >
+                      {stepContent}
+                    </div>
                   );
                 })}
               </div>

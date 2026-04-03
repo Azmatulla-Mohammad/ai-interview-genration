@@ -20,13 +20,16 @@ export function AppShell() {
   const location = useLocation();
   const { isAuthenticated, logout, user } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const isSessionRoute =
+    location.pathname.startsWith("/questions") ||
+    location.pathname.startsWith("/results");
 
   useEffect(() => {
     setMobileNavOpen(false);
   }, [location.pathname, isAuthenticated]);
 
   return (
-    <div className="site-shell">
+    <div className={`site-shell${isSessionRoute ? " site-shell-session" : ""}`}>
       <div className="background-orb background-orb-left" />
       <div className="background-orb background-orb-right" />
 
@@ -78,7 +81,7 @@ export function AppShell() {
         </div>
       </header>
 
-      <main className="page-shell">
+      <main className={`page-shell${isSessionRoute ? " page-shell-session" : ""}`}>
         <Outlet />
       </main>
 
