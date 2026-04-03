@@ -37,8 +37,5 @@ services:
         value: 20.15.1
       - key: VITE_API_BASE_URL
         value: /api
-      - key: BACKEND_HOSTPORT
-        fromService:
-          name: ai-interview-coach-api
-          type: web
-          property: hostport
+      - key: BACKEND_ORIGIN
+        sync: false
