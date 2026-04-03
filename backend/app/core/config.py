@@ -2,7 +2,7 @@ import logging
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import ValidationError
+from pydantic import ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -32,6 +32,18 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore",
     )
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_database_url(cls, value: str) -> str:
+        database_url = str(value or "").strip()
+
+        if database_url.startswith("postgres://"):
+            return f"postgresql+psycopg://{database_url[len('postgres://'):]}"
+        if database_url.startswith("postgresql://") and not database_url.startswith("postgresql+psycopg://"):
+            return f"postgresql+psycopg://{database_url[len('postgresql://'):]}"
+
+        return database_url
 
 
 def _summarize_validation_error(exc: ValidationError) -> str:
