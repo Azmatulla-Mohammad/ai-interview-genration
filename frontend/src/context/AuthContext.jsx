@@ -6,12 +6,23 @@ const AuthContext = createContext(null);
 const TOKEN_KEY = "ai-interview-coach-token";
 const USER_KEY = "ai-interview-coach-user";
 
+function readStoredUser() {
+  const storedUser = localStorage.getItem(USER_KEY);
+  if (!storedUser) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(storedUser);
+  } catch {
+    localStorage.removeItem(USER_KEY);
+    return null;
+  }
+}
+
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
-  const [user, setUser] = useState(() => {
-    const storedUser = localStorage.getItem(USER_KEY);
-    return storedUser ? JSON.parse(storedUser) : null;
-  });
+  const [user, setUser] = useState(() => readStoredUser());
   const [loading, setLoading] = useState(Boolean(token));
 
   useEffect(() => {
