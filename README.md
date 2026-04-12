@@ -273,7 +273,7 @@ cd ..
 ### 7. Run the backend
 
 ```powershell
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --app-dir backend
+.\start-backend.cmd
 ```
 
 Backend URL:
@@ -287,8 +287,7 @@ Backend URL:
 Open a second terminal:
 
 ```powershell
-cd frontend
-cmd /c npm.cmd run dev
+.\start-frontend.cmd
 ```
 
 Frontend URL:

@@ -20,6 +20,12 @@ from app.services.ai_service import get_ai_service_status
 
 
 logger = logging.getLogger(__name__)
+FAVICON_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+    '<rect width="64" height="64" rx="12" fill="#101828"/>'
+    '<path d="M18 42V22h6v20h-6Zm11 0 8-20h6l8 20h-7l-1.2-3.6h-8.2L33.4 42H29Zm7.2-8.8h4.9L38.7 26l-2.5 7.2Z" fill="#7dd3fc"/>'
+    "</svg>"
+)
 
 
 def _build_health_payload() -> dict:
@@ -74,6 +80,14 @@ def create_app() -> FastAPI:
             "environment": settings.app_env,
             "status": health["status"],
         }
+
+    @app.get("/favicon.ico", include_in_schema=False)
+    def favicon_ico() -> Response:
+        return Response(content=FAVICON_SVG, media_type="image/svg+xml")
+
+    @app.get("/favicon.svg", include_in_schema=False)
+    def favicon_svg() -> Response:
+        return Response(content=FAVICON_SVG, media_type="image/svg+xml")
 
     @app.get("/health")
     def health_check() -> dict:

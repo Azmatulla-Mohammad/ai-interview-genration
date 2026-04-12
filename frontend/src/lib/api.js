@@ -1,4 +1,5 @@
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
+const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+const API_BASE_URL = (configuredApiBaseUrl || "/api").replace(/\/$/, "");
 
 function buildQuery(params = {}) {
   const search = new URLSearchParams();
@@ -36,7 +37,7 @@ async function apiRequest(path, options = {}) {
     response = await fetch(`${API_BASE_URL}${path}`, config);
   } catch (error) {
     throw new Error(
-      "Cannot reach the backend API. Make sure the backend is running and the frontend API URL matches it.",
+      "Cannot reach the backend API. Make sure the backend is running and the frontend proxy or VITE_API_BASE_URL points to it.",
     );
   }
 
@@ -51,7 +52,7 @@ async function apiRequest(path, options = {}) {
     /<!doctype html>|<html/i.test(payload)
   ) {
     throw new Error(
-      "The frontend is pointing to itself instead of the backend API. Set VITE_API_BASE_URL to your backend URL ending with /api.",
+      "The frontend is pointing to itself instead of the backend API. Set VITE_API_BASE_URL to your backend URL ending with /api, or keep it as /api and use the frontend proxy.",
     );
   }
 

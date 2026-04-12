@@ -59,6 +59,12 @@ class ApiFlowTests(unittest.TestCase):
         reset_database_state()
         cls.temp_dir.cleanup()
 
+    def test_favicon_route_returns_icon(self) -> None:
+        response = self.client.get("/favicon.ico")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["content-type"], "image/svg+xml")
+
     def test_full_interview_flow(self) -> None:
         register_response = self.client.post(
             "/api/auth/register",
