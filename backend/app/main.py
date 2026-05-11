@@ -17,8 +17,6 @@ from app.core.database import (
     summarize_database_exception,
 )
 from app.services.ai_service import get_ai_service_status
-
-
 logger = logging.getLogger(__name__)
 FAVICON_SVG = (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
